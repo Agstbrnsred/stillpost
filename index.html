@@ -29,11 +29,12 @@
 
   /* ---------- face ---------- */
   #faceWrap {
-    display: flex; justify-content: center; align-items: center;
+    display: flex; flex-direction: column; justify-content: center; align-items: center;
     padding: 10px 0 0; background: var(--bg);
     flex-shrink: 0;
   }
-  #faceWrap iframe { border: 0; background: transparent; }
+  #faceImg { user-select: none; transition: opacity 0.25s ease; }
+  #faceTask { font-size: 11px; color: var(--cream-dim); font-style: italic; margin-top: 2px; min-height: 15px; text-align: center; max-width: 90%; }
 
   #statusStrip {
     display: flex; justify-content: center; gap: 8px;
@@ -140,7 +141,8 @@
 <body>
 
   <div id="faceWrap">
-    <iframe src="https://agentface.higgsfield.app/w/ag_02cf602a9f2e4d778d64" width="200" height="220" title="Stillpost"></iframe>
+    <img id="faceImg" src="faces/idle.png" width="180" height="181" alt="Stillpost" draggable="false">
+    <div id="faceTask">on the desk</div>
   </div>
 
   <div id="statusStrip">
@@ -334,8 +336,18 @@ YOUR OWN BODY: an AgentFace robot on Higgsfield with six faces; your face on the
 /* ================= face pings ================= */
 const FACE_URL = 'https://agentface.higgsfield.app/api/state';
 const FACE_TOKEN = 'af_e03c334a467c4be4b4b9bbb8f0c5ab736cd0dec34168';
+const FACE_STATES = ['idle','thinking','success','error','waiting','sleeping'];
+function setFace(state, task) {
+  // local face engine — his six faces, driven by app state
+  if (!FACE_STATES.includes(state)) state = 'idle';
+  const img = document.getElementById('faceImg');
+  img.style.opacity = '0';
+  setTimeout(() => { img.src = 'faces/' + state + '.png'; img.style.opacity = '1'; }, 200);
+  if (task) document.getElementById('faceTask').textContent = task;
+}
 function pingFace(state, task) {
-  // best-effort, never blocks the app
+  setFace(state, task); // local face first — always works
+  // best-effort mirror to the AgentFace wall widget, never blocks the app
   try {
     fetch(FACE_URL, {
       method: 'POST',
