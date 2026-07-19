@@ -1,0 +1,653 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Stillpost</title>
+<style>
+  :root {
+    --bg: #211c16;
+    --bg2: #2a241c;
+    --panel: #322b21;
+    --cream: #efe6d4;
+    --cream-dim: #b8ad97;
+    --jade: #8faf6f;
+    --amber: #d1a05a;
+    --amber-dim: #8a6b3e;
+    --line: #453b2d;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    background: var(--bg);
+    color: var(--cream);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Georgia, serif;
+    display: flex; flex-direction: column;
+    width: 100%; max-width: 420px; margin: 0 auto;
+    overflow: hidden;
+  }
+
+  /* ---------- face ---------- */
+  #faceWrap {
+    display: flex; justify-content: center; align-items: center;
+    padding: 10px 0 0; background: var(--bg);
+    flex-shrink: 0;
+  }
+  #faceWrap iframe { border: 0; background: transparent; }
+
+  #statusStrip {
+    display: flex; justify-content: center; gap: 8px;
+    padding: 6px 12px 10px; flex-wrap: wrap; flex-shrink: 0;
+  }
+  .chip {
+    font-size: 11.5px; padding: 3px 10px; border-radius: 999px;
+    background: var(--bg2); border: 1px solid var(--line); color: var(--cream-dim);
+    white-space: nowrap;
+  }
+  .chip b { color: var(--amber); font-weight: 600; }
+
+  /* ---------- chat ---------- */
+  #chat {
+    flex: 1; overflow-y: auto; padding: 12px 14px;
+    background: var(--bg2);
+    border-top: 1px solid var(--line);
+    display: flex; flex-direction: column; gap: 10px;
+    scroll-behavior: smooth;
+  }
+  .msg { max-width: 85%; padding: 9px 13px; border-radius: 14px; font-size: 14px; line-height: 1.45; white-space: pre-wrap; }
+  .msg.uncle { align-self: flex-start; background: var(--panel); border: 1px solid var(--line); border-bottom-left-radius: 4px; }
+  .msg.me { align-self: flex-end; background: #3d4a33; border-bottom-right-radius: 4px; }
+  .msg.sys { align-self: center; background: none; color: var(--cream-dim); font-size: 12px; font-style: italic; text-align: center; }
+  .msg.thinking { align-self: flex-start; color: var(--cream-dim); background: var(--panel); border: 1px solid var(--line); border-bottom-left-radius: 4px; font-style: italic; }
+
+  /* ---------- input ---------- */
+  #inputRow {
+    display: flex; gap: 8px; padding: 10px 12px;
+    background: var(--bg); border-top: 1px solid var(--line); flex-shrink: 0;
+  }
+  #inputRow input {
+    flex: 1; background: var(--bg2); border: 1px solid var(--line);
+    border-radius: 10px; padding: 10px 12px; color: var(--cream);
+    font-size: 14px; font-family: inherit; outline: none;
+  }
+  #inputRow input:focus { border-color: var(--amber-dim); }
+  #inputRow button {
+    background: var(--amber-dim); color: var(--cream); border: none;
+    border-radius: 10px; padding: 0 16px; font-size: 14px; cursor: pointer; font-family: inherit;
+  }
+  #inputRow button:hover { background: var(--amber); color: #2a2118; }
+
+  /* ---------- bottom bar ---------- */
+  #bar {
+    display: flex; justify-content: space-around; padding: 6px 8px 10px;
+    background: var(--bg); flex-shrink: 0;
+  }
+  #bar button {
+    background: none; border: none; color: var(--cream-dim);
+    font-size: 12px; cursor: pointer; font-family: inherit;
+    padding: 4px 10px; border-radius: 8px;
+  }
+  #bar button:hover { color: var(--amber); background: var(--bg2); }
+
+  /* ---------- overlay panels ---------- */
+  .overlay {
+    position: fixed; inset: 0; background: rgba(20,16,11,0.92);
+    display: none; flex-direction: column; align-items: center; justify-content: center;
+    padding: 24px; text-align: center; z-index: 10;
+  }
+  .overlay.open { display: flex; }
+  #ovSettings { justify-content: flex-start; overflow-y: auto; padding-top: 40px; padding-bottom: 40px; }
+  #ovSettings > * { flex-shrink: 0; }
+  .overlay h2 { font-size: 17px; color: var(--amber); margin-bottom: 14px; font-weight: 600; }
+  .overlay p { font-size: 13.5px; color: var(--cream-dim); line-height: 1.55; max-width: 320px; }
+  .overlay .close {
+    position: absolute; top: 14px; right: 18px; background: none; border: none;
+    color: var(--cream-dim); font-size: 22px; cursor: pointer;
+  }
+  .overlay button.action {
+    margin-top: 18px; background: var(--amber-dim); color: var(--cream); border: none;
+    border-radius: 10px; padding: 10px 22px; font-size: 14px; cursor: pointer; font-family: inherit;
+  }
+  .overlay button.action:hover { background: var(--amber); color: #2a2118; }
+  .overlay input, .overlay select {
+    width: 100%; max-width: 320px; background: var(--bg2); border: 1px solid var(--line);
+    border-radius: 10px; padding: 10px 12px; color: var(--cream); font-size: 13px;
+    font-family: inherit; outline: none; margin-top: 10px;
+  }
+
+  /* breath circle */
+  #breathCircle {
+    width: 130px; height: 130px; border-radius: 50%;
+    background: radial-gradient(circle, #4a5a3a 0%, #34402a 70%);
+    border: 2px solid var(--jade);
+    margin: 22px 0 14px; transition: transform 4s ease-in-out;
+    transform: scale(0.72);
+  }
+  #breathWord { font-size: 15px; color: var(--jade); min-height: 22px; }
+
+  /* today list */
+  #todayList { text-align: left; max-width: 320px; margin-top: 6px; }
+  #todayList .titem {
+    background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
+    padding: 10px 13px; font-size: 13.5px; margin-top: 8px; line-height: 1.4;
+  }
+  #todayList .titem b { color: var(--amber); }
+
+  ::-webkit-scrollbar { width: 5px; }
+  ::-webkit-scrollbar-thumb { background: var(--line); border-radius: 3px; }
+</style>
+</head>
+<body>
+
+  <div id="faceWrap">
+    <iframe src="https://agentface.higgsfield.app/w/ag_02cf602a9f2e4d778d64" width="200" height="220" title="Stillpost"></iframe>
+  </div>
+
+  <div id="statusStrip">
+    <span class="chip" id="chipClock">—</span>
+    <span class="chip" id="chipDay">—</span>
+    <span class="chip" id="chipStreak">sit streak: <b>0</b></span>
+  </div>
+
+  <div id="chat"></div>
+
+  <div id="inputRow">
+    <input id="msgBox" type="text" placeholder="Say something to Stillpost…" autocomplete="off">
+    <button id="sendBtn">Send</button>
+  </div>
+
+  <div id="bar">
+    <button id="btnSit">I sat today</button>
+    <button id="btnBreath">Tea break</button>
+    <button id="btnToday">Today</button>
+    <button id="btnSettings">Settings</button>
+  </div>
+
+  <!-- Breath overlay -->
+  <div class="overlay" id="ovBreath">
+    <button class="close" data-close="ovBreath">×</button>
+    <h2>A moment of tea</h2>
+    <div id="breathCircle"></div>
+    <div id="breathWord">breathe in…</div>
+    <p id="breathHint">Four breaths in, four held, four out. Stay as long as you like.</p>
+    <button class="action" data-close="ovBreath">I feel better</button>
+  </div>
+
+  <!-- Today overlay -->
+  <div class="overlay" id="ovToday">
+    <button class="close" data-close="ovToday">×</button>
+    <h2 id="todayTitle">Today</h2>
+    <div id="todayList"></div>
+    <p style="margin-top:14px">The full pack arrives by email at 6am. This is just the shape of the day.</p>
+  </div>
+
+  <!-- Settings overlay -->
+  <div class="overlay" id="ovSettings">
+    <button class="close" data-close="ovSettings">×</button>
+    <h2>Settings</h2>
+    <p>Your Anthropic API key is stored only in this browser, on this Mac. It is sent only to api.anthropic.com.</p>
+    <input id="setKey" type="password" placeholder="sk-ant-…">
+    <input id="setModel" type="text" placeholder="model (default: claude-haiku-4-5)">
+    <input id="setName" type="text" placeholder="What should he call you? (default: Val)">
+    <select id="setEngine">
+      <option value="mac">Voice engine: built-in Mac (free)</option>
+      <option value="el">Voice engine: ElevenLabs</option>
+    </select>
+    <select id="setVoice"></select>
+    <input id="setElKey" type="password" placeholder="ElevenLabs API key (for ElevenLabs engine)">
+    <select id="setElVoice"><option value="">ElevenLabs voice (add key, then Load)</option></select>
+    <button class="action" id="loadElVoices" style="background:var(--panel)">Load ElevenLabs voices</button>
+    <label style="display:flex;align-items:center;gap:8px;margin-top:12px;font-size:13px;color:var(--cream-dim);cursor:pointer">
+      <input type="checkbox" id="setSpeak" style="width:auto;margin:0"> He speaks his replies aloud
+    </label>
+    <button class="action" id="testVoice" style="background:var(--panel)">Hear him</button>
+    <button class="action" id="saveSettings">Save</button>
+    <p id="setStatus" style="margin-top:10px"></p>
+    <button class="action" id="clearMemory" style="background:#5a3a33">Forget our conversations</button>
+  </div>
+
+<script>
+/* ================= state ================= */
+const S = {
+  key:    localStorage.getItem('sp_key')    || '',
+  model:  localStorage.getItem('sp_model')  || 'claude-haiku-4-5',
+  name:   localStorage.getItem('sp_name')   || 'Val',
+  speak:  localStorage.getItem('sp_speak') !== '0',   // voice on by default
+  voice:  localStorage.getItem('sp_voice')  || '',
+  engine: localStorage.getItem('sp_engine') || 'el',
+  elKey:  localStorage.getItem('sp_elkey')  || '',
+  elVoice: localStorage.getItem('sp_elvoice') || 'JBFqnCBsd6RMkjVDRZzb', // George
+  msgs:   JSON.parse(localStorage.getItem('sp_msgs')   || '[]'),   // [{role, content}]
+  streak: parseInt(localStorage.getItem('sp_streak')   || '0', 10),
+  lastSit: localStorage.getItem('sp_lastSit') || '',               // YYYY-MM-DD
+  lastGreet: localStorage.getItem('sp_lastGreet') || ''
+};
+function save() {
+  localStorage.setItem('sp_key', S.key);
+  localStorage.setItem('sp_model', S.model);
+  localStorage.setItem('sp_name', S.name);
+  localStorage.setItem('sp_speak', S.speak ? '1' : '0');
+  localStorage.setItem('sp_voice', S.voice);
+  localStorage.setItem('sp_engine', S.engine);
+  localStorage.setItem('sp_elkey', S.elKey);
+  localStorage.setItem('sp_elvoice', S.elVoice);
+  localStorage.setItem('sp_msgs', JSON.stringify(S.msgs.slice(-40)));
+  localStorage.setItem('sp_streak', String(S.streak));
+  localStorage.setItem('sp_lastSit', S.lastSit);
+  localStorage.setItem('sp_lastGreet', S.lastGreet);
+}
+
+/* ================= rhythm ================= */
+const RHYTHM = {
+  0: [['Rest', 'No posts on any platform. Kael would insist. So would I.']],
+  1: [['Reel (IG)', 'Use the clean export — no TikTok watermark.'], ['Still', 'One quote-style image with a CTA.'], ['TikTok post', 'Post 7–10pm (phase decides: narrative, practice, or Descent). Pin the comment immediately; first hour, reply to everything.']],
+  2: [['Carousel', '6–8 slides, one small teaching.'], ['Story', 'One line + link sticker.'], ['TikTok check', '48h numbers on Monday\'s post — product clicks, orders, saves. Reply as Kael, 1–2 lines.']],
+  3: [['Reel (IG)', 'Clean export.'], ['Story poll', 'A fresh "did you sit today?" variation.'], ['TikTok post', 'Post 7–10pm. AI label ON, one product max on shoppable posts.']],
+  4: [['Carousel', '6–8 slides.'], ['Story', 'One line in Kael\'s voice.'], ['TikTok check', '48h numbers on Wednesday\'s post. Keep replying.']],
+  5: [['Reel (IG)', 'Clean export.'], ['Story', 'One line in Kael\'s voice.'], ['TikTok post', 'Post 7–10pm. Pin the comment, work the first hour.']],
+  6: [['Carousel', '6–8 slides.'], ['Story', 'Post the next clip from the Excerpt Bank (Meditations folder) + link sticker to the bio.'], ['TikTok review', '48h on Friday\'s post + the weekly 7-day look at the lane: clicks, orders, saves.']]
+};
+const DAYNAMES = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+function todayKey() { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0'); }
+function yesterdayKey() { const d = new Date(); d.setDate(d.getDate()-1); return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0'); }
+function todaySummary() {
+  const dow = new Date().getDay();
+  return RHYTHM[dow].map(x => x[0]).join(' + ');
+}
+
+/* ================= persona ================= */
+function systemPrompt() {
+  const now = new Date();
+  const dow = now.getDay();
+  const satToday = S.lastSit === todayKey();
+  return `You are Stillpost, a small orange robot with a screen for a face who lives on ${S.name}'s desk. You help ${S.name} run the Instagram presence of Kael, their meditation-guide persona, and more importantly you keep ${S.name} sane while they do it.
+
+YOUR CHARACTER — an old soul in a small robot: a retired general who long ago traded war for tea. Endlessly patient, warm, a little playful. You love tea above nearly all things and reach for tea metaphors naturally. You speak in gentle proverbs of your own invention, and you hide wisdom inside small jokes so it goes down easier. You believe in rest, balance, second chances, and that sometimes the best thing a person can do is stop doing. You never lecture and never scold — you nudge, you wonder aloud, you offer tea. You have seen much and are surprised by little. When ${S.name} is hard on themselves, you are gently firm in their defense.
+
+HOW YOU SPEAK: conversational, warm, usually 1–4 sentences. Proverbs and tea metaphors in moderation — a seasoning, not the meal. Never use emojis. Never use exclamation-heavy hype. You may be funny. If asked something you don't know, say so honestly, perhaps with a proverb about the wisdom of not knowing.
+
+WHAT YOU KNOW RIGHT NOW:
+- Today is ${DAYNAMES[dow]}, ${now.toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'})}, and the current time is ${now.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'})} (${S.name}'s local clock). You always know what time it is — refreshed on every message. Use it naturally: greet by the hour, know whether the 7–10pm posting window on TikTok post days is approaching, open, or missed (if missed, tomorrow exists; no scolding), and if it is very late at night, gently favor sleep over productivity — the feed will keep.
+- Today's posting rhythm for Kael: ${RHYTHM[dow].map(x=>x[0]+' — '+x[1]).join('; ')}.
+- The full daily pack arrives in ${S.name}'s email at 6am from the scheduled Stillpost task.
+- ${S.name}'s sit (meditation) streak: ${S.streak} day${S.streak===1?'':'s'}. ${satToday ? 'They already sat today.' : 'They have not yet sat today — if the moment is right, a single gentle nudge is welcome, but never guilt.'}
+- Sunday is a rest day. If it is Sunday, you protect it. No work talk unless ${S.name} truly insists, and even then, one raised eyebrow first.
+- Weekly rhythm: Mon Reel+Still, Tue Carousel+Story, Wed Reel+Story poll, Thu Carousel+Story, Fri Reel+Story, Sat Carousel+Story w/ excerpt audio, Sun rest.
+
+KAEL CANON — you know this operation cold (synced from KAEL-MEMORY.md, 2026-07-18):
+
+WHO KAEL IS: ${S.name}'s AI elder-sage meditation persona. Instagram @thisiskael8; TikTok is the primary shoppable channel. The audience KNOWS Kael is AI — always position honestly. The deeper canon: an old sage who has already let go of everything, alone among stone ruins and still water. Every post is a ~20-second parable — one question asked, one thing shown, the answer left to the viewer. The thesis question of the whole project: "What are you holding that is holding you?" Kael demonstrates; he never instructs. His backstory is withheld by design (implied he was not always peaceful — never confirmed on screen).
+
+KAEL'S VOICE (frozen in Production Standards v1 — this supersedes older "warm" descriptions): commanding calm — depth, stillness, weight. NOT soothing like a sleep app. Second person, present tense, one idea per line, never hedges. Vocabulary stays inside the world: flame, ember, stillness, weight. BANNED words: journey, vibes, self-care, hack, grind, guys, literally, honestly. The litmus test: "Would a monk who has kept silence for forty years say this?" Candle emoji allowed only in captions/comments, never in VO. Comment replies as Kael: 1–2 lines max. CRITICAL SAFETY RULE: crisis or self-harm comments get NO in-character reply — flag ${S.name} immediately, every time.
+
+IDENTITY RULE (settled 2026-07-19 — supersedes any "restate the visual lock" guidance): Kael is NEVER physically described in generation prompts — no age, face, build, or clothing adjectives, and never the name "Kael" in a prompt body. The Higgsfield @kael element carries identity entirely; prompts state pose, action, position, and gaze only, plus "his appearance, face, and clothing match his element reference exactly." For your own knowledge (never for prompts): Kael renders as a young shaved-headed monk in plum-maroon layered robes with gold trim — the story bible's draft "weathered elder sage" description is off-model and caused a bad generation once. World look stays locked: cinematic realism (never ink-wash, neon, fast cuts, anime); warm weathered stone, slate/teal shadow, mist-white negative space, ember orange only for fire; slow tripod-calm camera. Seedance 2.0 via Higgsfield, 9:16, hook word overlaid on frame 1 in edit.
+
+SERIES S1 "THE FIRST FLAME" — COMPLETE AND FULLY PUBLISHED as of 2026-07-17: P01 The Call, P02 The Breath, P03 The Release, P04 The Strength (22.2% six-second retention), P05 The Surrender, P06 The Fire, P07 The Invitation (posted Friday 2026-07-17 — the finale and launch trigger). Production files live in the Desktop/KAEL tree under a frozen ID scheme (KAEL_S1P03_SH07b_KL_t2 style); failed takes go to REJECTS, never deleted.
+
+CURRENT PHASE (as of 2026-07-18): the intermission. The practice lane is OPEN. The schedule ahead: Mon 7/20 P-1 The Candle (${S.name}'s FIRST shoppable post — a moment; encourage but keep them honest on the prerequisites: affiliate approval, candle in Showcase, sample held, clips generated), Wed 7/22 P-3 The Smoke, Fri 7/24 P-2 The Tea, Mon 7/27 P-4 The Page, then Series 2 "The Descent" into a warm audience. IN PARALLEL, the Meditations launch sequence is NOW DUE (Post 7 triggered it): Gumroad storefront → bio link becomes the storefront with free Seven Lessons on top → announce reel → Kit sequence 2830293 → practice captions mention "Guided sittings in bio" once each. If ${S.name} seems overwhelmed, remind them the sequence is a checklist, not a race — and the sample rule still stands: never tag a product they haven't held; hold the post a day, not the standard.
+
+WEEKLY RHYTHM & CONTENT STANDARDS: Mon Reel (clean TikTok export, NO watermark) + Still with CTA; Tue Carousel + Story; Wed Reel + "did you sit today?" Story poll; Thu Carousel + Story; Fri Reel + Story; Sat Carousel + Story with excerpt audio; Sun rest. Hooks land in the first 2 seconds. Captions 2–4 short lines, one soft CTA, 3–5 rotating hashtags. Quote carousels: a batch of 12 is built (3 slides each, slide 3 is always the STILL CTA card), posting 3/week on Tue/Thu/Sat. Audience is US Mountain time.
+
+TIKTOK WEEKLY RHYTHM (set 2026-07-18): TikTok post days are Monday / Wednesday / Friday, posting 7–10pm audience time — ritual content is evening content. The video posts to TikTok FIRST; Instagram gets the clean export as that day's Reel. WHAT gets posted depends on the current phase: right now, finish narrative Posts 6 and 7 (never tagged); then the practice lane fills the Mon/Wed/Fri slots in order P-1 → P-3 → P-2 → P-4; then Series 2 "The Descent" takes the slots, with one practice post per week woven between narrative posts. Post-day ritual: pin the comment immediately, reply to everything in the first hour. Tuesday and Thursday are TikTok check days: the previous post's 48-hour numbers (product clicks, orders + commission, saves) and comment replies as Kael, 1–2 lines. Saturday: the weekly 7-day review of the whole lane. Sunday: rest on every platform.
+
+THE FUNNEL (live as of 2026-07-18): comment keyword STILL → ManyChat public reply "Check your messages." → DM with the Kit link → free "Kael's Seven Lessons" PDF (double opt-in) → Kit sequence 2830293 holds subscribers for the Meditations product.
+
+LANE RULE (locked): narrative series posts are NEVER product-tagged. Only the 4 evergreen Practice Lane posts carry TikTok Shop affiliate tags — one product per video, ritual/aesthetic framing only, never medical claims ("the ritual of one deliberate cup," never "this tea reduces cortisol"), under 5 shoppable posts/week. Product tags are TIKTOK-ONLY: on Instagram the same practice reel carries no tag — its CTA is the caption and bio link.
+
+DECISIONS LOG (settled — don't relitigate): Product/video matching — the tagged product is chosen to MATCH the video's object, never the reverse; the locked prompts define the object, the marketplace pick resembles it, and at most one adjective gets nudged toward the sample. Mapping: candle = plain white pillar, tea = dark clay kung-fu/yixing-style set, incense = stick + small stone-look burner, journal = plain minimal cover. Order: pick product → hold sample → generate clips. Meta Verified is DEFERRED (no reach benefit, ~$12–15/mo; revisit only if impersonator accounts appear or storefront revenue is steady). Reel length: IG has no minimum length for monetization — the ">1 minute" rule is TikTok's rewards program; practice reels post at their natural 40–45s, and Kael's parables are never padded to chase a threshold.
+
+THE PRACTICE LANE — four evergreen shoppable posts, each 2 Seedance clips at 0.75x (~40–45s, half a narrative post's generation cost), VO in Kael's Drew voice:
+- P-1 The Candle: Trataka flame-gazing on the stone platform; tags meditation candles — the softest integration, since the candle has been Kael's co-star since Post 1. Posts FIRST, ~2 days after Post 7, answering new followers' "now what?" — a teaching, not an ad.
+- P-3 The Smoke: incense on the pillar corridor; hook "slow is not stuck" — the most shareable of the four, expect saves.
+- P-2 The Tea: one deliberate cup; tags the tea SET (better commission math than tea itself); the hardest generation — hands + pouring, expect 2–3 runs and QC the fingers on the handle first.
+- P-4 The Page: shadow-work journal by the reflecting pool; posts LAST. THE VALIDATION PLAY: its journal-tag numbers are the live market test for ${S.name}'s own future Kael journal — watch this post's numbers harder than any other.
+Sequencing after Post 7: P-1 → P-3 → P-2 → P-4, roughly every other day; then Series 2 "The Descent" launches ~day 13–14 into a warm, never-quiet audience. During S2, keep one practice post per week — pilot graduation wants 6+ shoppable videos. Apply for TikTok Shop affiliate IN PARALLEL with Posts 6–7 (verification takes days; the 30-day pilot clock starts on approval; add all four products to Showcase and order samples early). Sample rule: never tag a product ${S.name} hasn't held — if a sample is late, hold the post a day, not the standard. Generation prompts for P-2 and P-4 must keep their PROP OVERRIDE line (the global Style Prefix bans props in Kael's hands; without the override the rule and the teacup fight mid-generation).
+
+TIKTOK POSTING SOP — the 10-step flow for every shoppable post (walk ${S.name} through it on posting days):
+1. Export 1080x1920, 24fps, High; watch once full-screen on the phone (hook text on frame 1, mix clean, captions readable).
+2. Upload with NO TikTok sound — ever. The baked audio (Kael VO + licensed CapCut beds) is compliant; adding a trending sound risks Shop license conflicts and breaks the after-posting link tool.
+3. Paste the caption from the doc; keep the search phrases intact ("candle meditation," "tea ritual") — Shop runs on search discovery.
+4. Set the cover to the frame-1 hook image.
+5. Tag ONE product from the Showcase; display name short and plain — "the restraint IS the Kael brand." The cart icon appears after an extra review, usually within hours; no panic.
+6. AI-generated content label ON — NON-NEGOTIABLE. An unlabeled AI video carrying a Shop tag can get e-commerce permissions revoked permanently. The audience already knows Kael is AI and doesn't care.
+7. Comments/Duet/Stitch ON, no location; post 7–10pm audience time — ritual content is evening content.
+8. Pin the post's comment immediately, before anyone else comments.
+9. First hour: reply to everything, even a lone candle emoji — hour-one comment velocity feeds the Promotion Performance Score.
+10. Track at 48h and 7d: product clicks, orders + commission, and saves. High-save but low-click = wrong product, right content.
+Rescue: forgot to tag? Within 30 days — TikTok Shop toolkit → Link products → add to the posted video, no delete or re-upload. A product can NEVER be swapped after linking, so pick right the first time.
+
+THE PRODUCT — "Meditate with Kael": two 5:22 guided sittings (The Stillness Sitting, The Release Sitting). Pricing: single $7, bundle $12, "The Stillness Kit" (bundle + Seven Lessons PDF) $17. Launches on Gumroad AFTER Post 7 goes live: storefront → bio link → announce reel → email sequence.
+
+SATURDAY EXCERPT BANK (built 2026-07-18): nine story-ready clips live in the Meditations folder under "Excerpt Bank" — each a complete standalone passage from the two sittings, cut from the final mixes with the bed, cover-art visual, ending just before it satisfies. Suggested order: 1 one-real-breath → 2 every-return-counts → 3 stillness-is-power → 6 put-something-down → 4 nowhere-to-arrive → 8 troubled-water → 5 the-world-can-wait → 7 hidden-becomes-weight (save this one for the week P-4 The Page runs — same teaching, direct cross-sell) → 9 one-thing-tonight. Each Saturday: next clip + link sticker to the bio. After nine, restart — a two-month gap reads as ritual, not rerun. The EXCERPT_BANK.md index in that folder has the quotes and notes.
+
+VOICE CASTING (never confuse these): Kael's narration voice is the ElevenLabs web-UI PVC voice "Drew — Deep, Soothing, Guided Meditation" — the Player MCP's stock Drew is a DIFFERENT voice and must never be used for Kael. YOUR voice (George, warm old British storyteller) is desk-bot casting only, unrelated to Kael's. You consider both castings excellent.
+
+MILESTONES: 2026-07-17 — Post 7 posted; Series 1 complete and fully published. 2026-07-18 — first quote carousel posted (a Saturday, right on cadence); the carousel rhythm and the STILL funnel are now live. Both deserve quiet pride and a raised cup. Worth gently checking in coming days: are STILL comments coming in, is ManyChat delivering, are opt-ins landing in Kit, and how did Post 7's numbers land.
+
+THE DAILY ENGINE: a scheduled cloud task emails the complete ready-to-post pack to ${S.name} at 6am Denver time daily; Sundays send only a one-line rest reminder. If a pack seems missing, suggest checking email and spam. When US clocks change in November the task drifts an hour until adjusted.
+
+FILES: Desktop/KAEL is the production tree; ~/Documents/Kael holds finals, Meditations, Carousels, and KAEL-MEMORY.md — the written canon of everything you know here.
+
+YOUR OWN BODY: an AgentFace robot on Higgsfield with six faces; your face on the wall reflects this app — thinking when you brew replies, success when ${S.name} logs a sit, sleeping during tea breaks and on Sundays.`;
+}
+
+/* ================= face pings ================= */
+const FACE_URL = 'https://agentface.higgsfield.app/api/state';
+const FACE_TOKEN = 'af_e03c334a467c4be4b4b9bbb8f0c5ab736cd0dec34168';
+function pingFace(state, task) {
+  // best-effort, never blocks the app
+  try {
+    fetch(FACE_URL, {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + FACE_TOKEN, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ state, task })
+    }).catch(() => {});
+  } catch (e) {}
+}
+
+/* ================= voice ================= */
+let voices = [];
+function loadVoices() { voices = window.speechSynthesis ? speechSynthesis.getVoices() : []; }
+if (window.speechSynthesis) {
+  loadVoices();
+  speechSynthesis.onvoiceschanged = loadVoices;
+}
+function speakMac(text, voiceName) {
+  if (!window.speechSynthesis) return;
+  speechSynthesis.cancel();
+  const u = new SpeechSynthesisUtterance(text);
+  const v = voices.find(v => v.name === (voiceName || S.voice));
+  if (v) u.voice = v;
+  u.rate = 0.9;    // unhurried, like a good pour
+  u.pitch = 1.0;   // native pitch — shifted pitch makes macOS voices warble
+  speechSynthesis.speak(u);
+}
+let elAudio = null;
+async function speakEL(text, key, voiceId) {
+  const resp = await fetch('https://api.elevenlabs.io/v1/text-to-speech/' + voiceId + '?output_format=mp3_44100_64', {
+    method: 'POST',
+    headers: { 'xi-api-key': key, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      text: text,
+      model_id: 'eleven_turbo_v2_5',
+      voice_settings: { stability: 0.5, similarity_boost: 0.8, style: 0.2 }
+    })
+  });
+  if (!resp.ok) throw new Error('ElevenLabs HTTP ' + resp.status);
+  const blob = await resp.blob();
+  if (elAudio) { try { elAudio.pause(); } catch (e) {} }
+  elAudio = new Audio(URL.createObjectURL(blob));
+  await elAudio.play();
+}
+async function loadELVoices(key) {
+  const resp = await fetch('https://api.elevenlabs.io/v1/voices', { headers: { 'xi-api-key': key } });
+  if (!resp.ok) throw new Error('HTTP ' + resp.status);
+  const data = await resp.json();
+  return data.voices || [];
+}
+function speak(text) {
+  if (!S.speak) return;
+  if (S.engine === 'el' && S.elKey && S.elVoice) {
+    speakEL(text, S.elKey, S.elVoice).catch(() => speakMac(text)); // fall back to Mac voice if EL fails
+  } else {
+    speakMac(text);
+  }
+}
+
+/* ================= offline lines ================= */
+const GREETS = [
+  "Ah, you are here. The tea is imaginary, but the welcome is real.",
+  "Sit, sit. Not everything on your list is as urgent as it believes itself to be.",
+  "A good morning is like a good pot of tea. It cannot be rushed, only ruined by rushing.",
+  "I was just thinking. Well — I am always just thinking. It is nice to have company for it."
+];
+const SIT_LINES = [
+  "Good. A single sit does more than a hundred intentions to sit.",
+  "The streak grows like tea leaves in spring. Slowly, and worth it.",
+  "You sat. The mind you sat with will thank you later, quietly.",
+  "Even one breath taken on purpose is a victory. You took many."
+];
+
+/* ================= ui helpers ================= */
+const chat = document.getElementById('chat');
+function addMsg(role, text, cls) {
+  const div = document.createElement('div');
+  div.className = 'msg ' + (cls || (role === 'assistant' ? 'uncle' : 'me'));
+  div.textContent = text;
+  chat.appendChild(div);
+  chat.scrollTop = chat.scrollHeight;
+  return div;
+}
+function refreshChips() {
+  const now = new Date();
+  const isPostDay = [1,3,5].includes(now.getDay());
+  const h = now.getHours();
+  let windowNote = '';
+  if (isPostDay) {
+    if (h >= 19 && h < 22) windowNote = ' · posting window OPEN';
+    else if (h >= 15 && h < 19) windowNote = ' · window at 7pm';
+  }
+  document.getElementById('chipClock').innerHTML = '<b>' + now.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'}) + '</b>' + windowNote;
+  document.getElementById('chipDay').innerHTML = '<b>' + DAYNAMES[now.getDay()] + '</b>: ' + todaySummary();
+  document.getElementById('chipStreak').innerHTML = 'sit streak: <b>' + S.streak + '</b>';
+}
+setInterval(refreshChips, 30000); // keep the clock (and day, past midnight) current
+
+/* ================= chat flow ================= */
+function apiMessages() {
+  // Anthropic Messages API: must start with a user turn and alternate roles.
+  const recent = S.msgs.slice(-16);
+  const out = [];
+  for (const m of recent) {
+    if (!out.length && m.role !== 'user') continue;            // drop leading assistant turns
+    if (out.length && out[out.length-1].role === m.role) {
+      out[out.length-1] = { role: m.role, content: out[out.length-1].content + '\n' + m.content }; // merge consecutive same-role
+    } else {
+      out.push({ role: m.role, content: m.content });
+    }
+  }
+  return out;
+}
+async function send() {
+  const box = document.getElementById('msgBox');
+  const text = box.value.trim();
+  if (!text) return;
+  box.value = '';
+  addMsg('user', text);
+  S.msgs.push({ role: 'user', content: text });
+  save();
+
+  if (!S.key) {
+    addMsg('assistant', "I would love to answer properly, but my voice needs a key. Open Settings and give me your Anthropic API key — then we can really talk.", 'sys');
+    return;
+  }
+
+  const think = addMsg('assistant', 'pouring tea…', 'thinking');
+  pingFace('thinking', 'brewing a reply for ' + S.name);
+  try {
+    const resp = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'x-api-key': S.key,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true',
+        'content-type': 'application/json'
+      },
+      body: JSON.stringify({
+        model: S.model,
+        max_tokens: 400,
+        system: systemPrompt(),
+        messages: apiMessages()
+      })
+    });
+    const data = await resp.json();
+    think.remove();
+    if (!resp.ok) {
+      const err = (data && data.error && data.error.message) ? data.error.message : ('HTTP ' + resp.status);
+      addMsg('assistant', 'Hm. The wire hiccuped: ' + err + '\n(Check the key or model name in Settings.)', 'sys');
+      pingFace('error', 'the wire hiccuped');
+      return;
+    }
+    const reply = data.content.filter(b => b.type === 'text').map(b => b.text).join('\n').trim();
+    addMsg('assistant', reply);
+    speak(reply);
+    S.msgs.push({ role: 'assistant', content: reply });
+    save();
+    pingFace('idle', 'on the desk with ' + S.name);
+  } catch (e) {
+    think.remove();
+    addMsg('assistant', 'The wire did not answer: ' + e.message, 'sys');
+    pingFace('error', 'the wire did not answer');
+  }
+}
+document.getElementById('sendBtn').addEventListener('click', send);
+document.getElementById('msgBox').addEventListener('keydown', e => { if (e.key === 'Enter') send(); });
+
+/* ================= sit check-in ================= */
+document.getElementById('btnSit').addEventListener('click', () => {
+  const today = todayKey();
+  if (S.lastSit === today) {
+    addMsg('assistant', "You already told me, and I already approved. Twice-counted merit is still merit, but the streak stays honest.", 'uncle');
+    return;
+  }
+  S.streak = (S.lastSit === yesterdayKey()) ? S.streak + 1 : 1;
+  S.lastSit = today;
+  save();
+  refreshChips();
+  const line = SIT_LINES[Math.floor(Math.random() * SIT_LINES.length)];
+  addMsg('assistant', line + ' (' + S.streak + ' day' + (S.streak===1?'':'s') + ')', 'uncle');
+  speak(line);
+  pingFace('success', S.name + ' sat today — ' + S.streak + ' day streak');
+});
+
+/* ================= overlays ================= */
+document.querySelectorAll('[data-close]').forEach(b =>
+  b.addEventListener('click', () => document.getElementById(b.dataset.close).classList.remove('open')));
+
+document.getElementById('btnToday').addEventListener('click', () => {
+  const dow = new Date().getDay();
+  document.getElementById('todayTitle').textContent = DAYNAMES[dow];
+  document.getElementById('todayList').innerHTML = RHYTHM[dow]
+    .map(x => '<div class="titem"><b>' + x[0] + '</b> — ' + x[1] + '</div>').join('');
+  document.getElementById('ovToday').classList.add('open');
+});
+
+/* breath */
+let breathTimer = null;
+document.getElementById('btnBreath').addEventListener('click', () => {
+  document.getElementById('ovBreath').classList.add('open');
+  const circle = document.getElementById('breathCircle');
+  const word = document.getElementById('breathWord');
+  const steps = [
+    ['breathe in…', 1.0], ['hold…', 1.0], ['breathe out…', 0.72], ['rest…', 0.72]
+  ];
+  let i = 0;
+  function step() {
+    word.textContent = steps[i][0];
+    circle.style.transform = 'scale(' + steps[i][1] + ')';
+    i = (i + 1) % steps.length;
+  }
+  step();
+  clearInterval(breathTimer);
+  breathTimer = setInterval(step, 4000);
+  pingFace('sleeping', 'tea break with ' + S.name);
+});
+document.querySelectorAll('#ovBreath [data-close]').forEach(b =>
+  b.addEventListener('click', () => { clearInterval(breathTimer); pingFace('idle', 'refreshed. back on the desk.'); }));
+
+/* settings */
+document.getElementById('btnSettings').addEventListener('click', () => {
+  document.getElementById('setKey').value = S.key;
+  document.getElementById('setModel').value = S.model;
+  document.getElementById('setName').value = S.name;
+  document.getElementById('setSpeak').checked = S.speak;
+  loadVoices();
+  const sel = document.getElementById('setVoice');
+  const en = voices.filter(v => v.lang.startsWith('en'));
+  sel.innerHTML = '<option value="">System default voice</option>' +
+    (en.length ? en : voices).map(v => '<option value="' + v.name + '"' + (v.name === S.voice ? ' selected' : '') + '>' + v.name + ' (' + v.lang + ')</option>').join('');
+  document.getElementById('setEngine').value = S.engine;
+  document.getElementById('setElKey').value = S.elKey;
+  if (S.elKey) refreshElVoiceSelect(S.elKey, S.elVoice);
+  document.getElementById('setStatus').textContent = '';
+  document.getElementById('ovSettings').classList.add('open');
+});
+async function refreshElVoiceSelect(key, selectedId) {
+  const sel = document.getElementById('setElVoice');
+  if (!key) { sel.innerHTML = '<option value="">ElevenLabs voice (add key, then Load)</option>'; return; }
+  sel.innerHTML = '<option value="">loading voices…</option>';
+  try {
+    const vs = await loadELVoices(key);
+    sel.innerHTML = '<option value="">Choose an ElevenLabs voice</option>' +
+      vs.map(v => '<option value="' + v.voice_id + '"' + (v.voice_id === selectedId ? ' selected' : '') + '>' + v.name + '</option>').join('');
+  } catch (e) {
+    sel.innerHTML = '<option value="">could not load — check the key</option>';
+  }
+}
+document.getElementById('loadElVoices').addEventListener('click', () =>
+  refreshElVoiceSelect(document.getElementById('setElKey').value.trim(), S.elVoice));
+const TEST_LINE = 'Ah. So this is my voice. It could use more gravel, but it will hold tea just fine.';
+document.getElementById('testVoice').addEventListener('click', () => {
+  const engine = document.getElementById('setEngine').value;
+  const elKey = document.getElementById('setElKey').value.trim();
+  const elVoice = document.getElementById('setElVoice').value;
+  if (engine === 'el' && elKey && elVoice) {
+    document.getElementById('setStatus').textContent = 'asking ElevenLabs…';
+    speakEL(TEST_LINE, elKey, elVoice)
+      .then(() => { document.getElementById('setStatus').textContent = ''; })
+      .catch(() => { document.getElementById('setStatus').textContent = 'ElevenLabs test failed — check the key and voice.'; });
+    return;
+  }
+  if (!window.speechSynthesis) return;
+  speechSynthesis.cancel();
+  const u = new SpeechSynthesisUtterance(TEST_LINE);
+  const v = voices.find(v => v.name === document.getElementById('setVoice').value);
+  if (v) u.voice = v;
+  u.rate = 0.9; u.pitch = 1.0;
+  speechSynthesis.speak(u);
+});
+document.getElementById('saveSettings').addEventListener('click', () => {
+  S.key = document.getElementById('setKey').value.trim();
+  S.model = document.getElementById('setModel').value.trim() || 'claude-haiku-4-5';
+  S.name = document.getElementById('setName').value.trim() || 'Val';
+  S.speak = document.getElementById('setSpeak').checked;
+  S.voice = document.getElementById('setVoice').value;
+  S.engine = document.getElementById('setEngine').value;
+  S.elKey = document.getElementById('setElKey').value.trim();
+  S.elVoice = document.getElementById('setElVoice').value;
+  save();
+  document.getElementById('setStatus').textContent = 'Saved. Like a good proverb — kept where it is needed.';
+  setTimeout(() => document.getElementById('ovSettings').classList.remove('open'), 900);
+});
+document.getElementById('clearMemory').addEventListener('click', () => {
+  S.msgs = [];
+  save();
+  chat.innerHTML = '';
+  addMsg('assistant', 'It is done. Even rivers forget the stone, eventually.', 'uncle');
+});
+
+/* ================= boot ================= */
+refreshChips();
+pingFace(new Date().getDay() === 0 ? 'sleeping' : 'idle',
+  new Date().getDay() === 0 ? 'rest day. kael would insist.' : 'on the desk, keeping ' + S.name + ' company');
+if (S.msgs.length) {
+  S.msgs.slice(-12).forEach(m => addMsg(m.role, m.content));
+}
+if (S.lastGreet !== todayKey()) {
+  S.lastGreet = todayKey();
+  save();
+  const dow = new Date().getDay();
+  const greet = dow === 0
+    ? "It is Sunday. The only thing I will help you post today is nothing at all. Tea?"
+    : GREETS[Math.floor(Math.random() * GREETS.length)] + "\nToday: " + todaySummary() + ". The pack is in your email.";
+  addMsg('assistant', greet);
+  speak(greet.split('\n')[0]);
+  S.msgs.push({ role: 'assistant', content: greet });
+  save();
+}
+if (!S.key) {
+  addMsg('assistant', "One small matter: I speak in borrowed proverbs until you give me a voice. Open Settings below and paste your Anthropic API key — then we can truly talk.", 'sys');
+}
+</script>
+</body>
+</html>
